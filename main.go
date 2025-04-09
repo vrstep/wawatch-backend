@@ -1,14 +1,15 @@
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/vrstep/wawatch-backend/routes"
+)
 
 func main() {
 
 	router := gin.New()
 
-	router.GET("/", func(c *gin.Context) {
-		c.String(200, "Hello World")
-	})
+	routes.UserRoute(router)
 
 	router.Run(":8080")
 
