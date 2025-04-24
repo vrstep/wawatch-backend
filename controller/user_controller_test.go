@@ -82,17 +82,17 @@ func TestUpdateMyProfile(t *testing.T) {
 
 	// Mock DB Expectations
 	// 1. Expect GORM to fetch the user first
-	// Be specific with the argument type (GORM often uses int64 for uint PKs in queries)
 	mock.ExpectQuery(EscapeQuery(`SELECT * FROM "users" WHERE "users"."id" = $1 AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1`)).
-		WithArgs(int64(mockUserID)). // Reverted and cast to int64
-		WillReturnRows(sqlmock.NewRows([]string{"id", "username", "email", "profile_picture"}).
-			AddRow(mockUserID, mockUser.Username, mockUser.Email, "old_pic.jpg"))
+		WithArgs(int64(mockUserID)).
+		// Ensure all columns GORM expects for models.User (including gorm.Model) are provided
+		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at", "deleted_at", "username", "password", "email", "role", "profile_picture"}).
+			AddRow(mockUserID, time.Now(), time.Now(), nil, mockUser.Username, "hashedpassword", mockUser.Email, mockUser.Role, "old_pic.jpg")) // Add dummy values for all fields
 
 	// 2. Expect GORM to begin a transaction, update, and commit
 	mock.ExpectBegin()
 	// Use int64 for the ID in the WHERE clause
 	mock.ExpectExec(EscapeQuery(`UPDATE "users" SET "email"=$1,"profile_picture"=$2,"updated_at"=$3 WHERE "users"."deleted_at" IS NULL AND "id" = $4`)).
-		WithArgs(updateInput["email"], updateInput["profile_picture"], MockAnyTime{}, int64(mockUserID)). // Use int64 for ID
+		WithArgs(updateInput["email"], updateInput["profile_picture"], MockAnyTime{}, int64(mockUserID)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
