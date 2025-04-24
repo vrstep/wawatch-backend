@@ -9,7 +9,7 @@ import (
 func AnimeRoute(router *gin.Engine) {
 	anime := router.Group("/anime")
 	{
-		anime.GET("/search", controller.SearchAnime)
+		anime.GET("/search", middleware.RequireAuth, controller.SearchAnime)
 		anime.GET("/:id", controller.GetAnimeDetails)
 
 		// Protected routes

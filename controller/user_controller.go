@@ -92,7 +92,7 @@ func Signup(c *gin.Context) {
 	}
 
 	if err := config.DB.Create(&user).Error; err != nil {
-		c.JSON(500, gin.H{"error": "Failed to create user"})
+		c.JSON(500, gin.H{"error": "Failed to create user", "details": err.Error()})
 		return
 	}
 
