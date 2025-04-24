@@ -225,3 +225,124 @@ func (c *AniListClient) executeQuery(query string, variables map[string]interfac
 
 	return body, nil
 }
+
+// Helper function to execute paged media queries
+func (c *AniListClient) executePagedMediaQuery(query string, variables map[string]interface{}) ([]models.AnimeCache, int, error) {
+	response, err := c.executeQuery(query, variables)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	var result struct {
+		Data struct {
+			Page struct {
+				PageInfo struct {
+					Total int `json:"total"`
+				} `json:"pageInfo"`
+				Media []struct {
+					ID    int `json:"id"`
+					Title struct {
+						Romaji  string `json:"romaji"`
+						English string `json:"english"`
+					} `json:"title"`
+					CoverImage struct {
+						Large string `json:"large"`
+					} `json:"coverImage"`
+					Format   string `json:"format"`
+					Episodes *int   `json:"episodes"` // Use pointer for nullable
+				} `json:"media"`
+			} `json:"Page"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(response, &result); err != nil {
+		return nil, 0, fmt.Errorf("failed to parse paged media results: %v", err)
+	}
+
+	// Convert to AnimeCache objects
+	animes := make([]models.AnimeCache, len(result.Data.Page.Media))
+	for i, media := range result.Data.Page.Media {
+		title := media.Title.English
+		if title == "" {
+			title = media.Title.Romaji
+		}
+
+		animes[i] = models.AnimeCache{
+			ID:            media.ID,
+			Title:         title,
+			CoverImage:    media.CoverImage.Large,
+			Format:        media.Format,
+			TotalEpisodes: media.Episodes, // Assign pointer directly
+		}
+	}
+
+	return animes, result.Data.Page.PageInfo.Total, nil
+}
+
+// GetPopularAnime fetches popular anime
+func (c *AniListClient) GetPopularAnime(page int, perPage int) ([]models.AnimeCache, int, error) {
+	gqlQuery := `
+    query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+            pageInfo { total currentPage lastPage hasNextPage }
+            media(type: ANIME, sort: POPULARITY_DESC) {
+                id
+                title { romaji english }
+                coverImage { large }
+                format
+                episodes
+            }
+        }
+    }`
+	variables := map[string]interface{}{
+		"page":    page,
+		"perPage": perPage,
+	}
+	return c.executePagedMediaQuery(gqlQuery, variables)
+}
+
+// GetTrendingAnime fetches trending anime
+func (c *AniListClient) GetTrendingAnime(page int, perPage int) ([]models.AnimeCache, int, error) {
+	gqlQuery := `
+    query ($page: Int, $perPage: Int) {
+        Page(page: $page, perPage: $perPage) {
+            pageInfo { total currentPage lastPage hasNextPage }
+            media(type: ANIME, sort: TRENDING_DESC) {
+                id
+                title { romaji english }
+                coverImage { large }
+                format
+                episodes
+            }
+        }
+    }`
+	variables := map[string]interface{}{
+		"page":    page,
+		"perPage": perPage,
+	}
+	return c.executePagedMediaQuery(gqlQuery, variables)
+}
+
+// GetAnimeBySeason fetches anime by year and season
+func (c *AniListClient) GetAnimeBySeason(year int, season string, page int, perPage int) ([]models.AnimeCache, int, error) {
+	gqlQuery := `
+    query ($page: Int, $perPage: Int, $season: MediaSeason, $seasonYear: Int) {
+        Page(page: $page, perPage: $perPage) {
+            pageInfo { total currentPage lastPage hasNextPage }
+            media(type: ANIME, season: $season, seasonYear: $seasonYear, sort: POPULARITY_DESC) {
+                id
+                title { romaji english }
+                coverImage { large }
+                format
+                episodes
+            }
+        }
+    }`
+	variables := map[string]interface{}{
+		"page":       page,
+		"perPage":    perPage,
+		"season":     season, // WINTER, SPRING, SUMMER, FALL
+		"seasonYear": year,
+	}
+	return c.executePagedMediaQuery(gqlQuery, variables)
+}

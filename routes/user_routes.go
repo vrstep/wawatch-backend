@@ -7,13 +7,19 @@ import (
 )
 
 func UserRoute(router *gin.Engine) {
-	router.GET("/", controller.GetUsers)
-	router.POST("/", controller.CreateUser)
-	router.GET("/:id", controller.GetUser)
-	router.PUT("/:id", middleware.RequireAuth, controller.UpdateUser)
-	router.DELETE("/:id", middleware.RequireAuth, controller.DeleteUser)
-
+	// ...existing code...
 	router.POST("/signup", controller.Signup)
 	router.POST("/login", controller.Login)
 	router.GET("/validate", middleware.RequireAuth, controller.Validate)
+
+	// Profile routes (require authentication)
+	profile := router.Group("/profile")
+	profile.Use(middleware.RequireAuth)
+	{
+		profile.GET("/", controller.GetMyProfile)    // New Endpoint 1
+		profile.PUT("/", controller.UpdateMyProfile) // New Endpoint 2
+	}
+
+	// Public user list view
+	router.GET("/users/:username/animelist", controller.GetUserPublicAnimeList) // New Endpoint 9
 }

@@ -30,6 +30,7 @@ func main() {
 	routes.UserRoute(router)
 	routes.AnimeRoute(router)
 	routes.UserAnimeListRoute(router)
+	routes.ProviderRoute(router)
 
 	router.Run(":8080")
 }

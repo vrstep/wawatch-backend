@@ -331,3 +331,60 @@ func DeleteListEntry(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "Entry deleted successfully"})
 }
+
+// GetUserAnimeListStats calculates and returns statistics for the user's anime list
+func GetUserAnimeListStats(c *gin.Context) {
+	userInterface, exists := c.Get("user")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
+		return
+	}
+	userModel := userInterface.(models.User)
+
+	var list []models.UserAnimeList
+	if err := config.DB.Where("user_id = ?", userModel.ID).Find(&list).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve anime list"})
+		return
+	}
+
+	stats := gin.H{
+		"total_anime":      len(list),
+		"episodes_watched": 0,
+		"mean_score":       0.0,
+		"status_counts": map[string]int{
+			models.Watching:   0,
+			models.Completed:  0,
+			models.Planned:    0,
+			models.Dropped:    0,
+			models.Paused:     0,
+			models.Rewatching: 0,
+		},
+	}
+
+	totalScore := 0
+	scoredCount := 0
+	totalEpisodesWatched := 0
+
+	for _, item := range list {
+		// Increment status count
+		if count, ok := stats["status_counts"].(map[string]int)[item.Status]; ok {
+			stats["status_counts"].(map[string]int)[item.Status] = count + 1
+		}
+
+		// Add progress to total episodes watched
+		totalEpisodesWatched += item.Progress
+
+		// Calculate mean score (only for items with a score)
+		if item.Score != nil && *item.Score > 0 {
+			totalScore += *item.Score
+			scoredCount++
+		}
+	}
+
+	stats["episodes_watched"] = totalEpisodesWatched
+	if scoredCount > 0 {
+		stats["mean_score"] = float64(totalScore) / float64(scoredCount)
+	}
+
+	c.JSON(http.StatusOK, stats)
+}

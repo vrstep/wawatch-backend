@@ -21,5 +21,8 @@ func UserAnimeListRoute(router *gin.Engine) {
 
 		// Delete a list entry
 		list.DELETE("/:id", controller.DeleteListEntry)
+
+		list.GET("/stats", controller.GetUserAnimeListStats) // New Endpoint 3
+
 	}
 }
