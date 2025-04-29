@@ -3,11 +3,13 @@ package main
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/vrstep/wawatch-backend/config"
+	"github.com/vrstep/wawatch-backend/middleware"
 	"github.com/vrstep/wawatch-backend/routes"
 )
 
 func main() {
 	router := gin.New()
+	router.Use(middleware.Logging())
 
 	config.ConnectDB()
 
@@ -33,4 +35,5 @@ func main() {
 	routes.ProviderRoute(router)
 
 	router.Run(":8080")
+	router.Run(":8081")
 }
