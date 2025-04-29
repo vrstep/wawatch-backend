@@ -67,10 +67,14 @@ func TestUpdateMyProfile(t *testing.T) {
 
 	// Mock User Data
 	mockUserID := uint(1)
+	currentTime := time.Now()
 	mockUser := models.User{
-		Model:    gorm.Model{ID: mockUserID},
-		Username: "testuser",
-		Email:    "old@test.com",
+		Model:          gorm.Model{ID: mockUserID, CreatedAt: currentTime, UpdatedAt: currentTime},
+		Username:       "testuser",
+		Password:       "hashedpassword",
+		Email:          "old@test.com",
+		Role:           "user",
+		ProfilePicture: "old_pic.jpg",
 	}
 
 	// Input Data
@@ -82,23 +86,23 @@ func TestUpdateMyProfile(t *testing.T) {
 
 	// Mock DB Expectations
 	// 1. Expect GORM to fetch the user first
-	mock.ExpectQuery(EscapeQuery(`SELECT * FROM "users" WHERE "users"."id" = $1 AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1`)).
+	mock.ExpectQuery(`SELECT \* FROM "users" WHERE "users"\."id" = \$1 AND "users"\."deleted_at" IS NULL ORDER BY "users"\."id" LIMIT 1`).
 		WithArgs(int64(mockUserID)).
-		// Ensure all columns GORM expects for models.User (including gorm.Model) are provided
 		WillReturnRows(sqlmock.NewRows([]string{"id", "created_at", "updated_at", "deleted_at", "username", "password", "email", "role", "profile_picture"}).
-			AddRow(mockUserID, time.Now(), time.Now(), nil, mockUser.Username, "hashedpassword", mockUser.Email, mockUser.Role, "old_pic.jpg")) // Add dummy values for all fields
+			AddRow(mockUser.ID, mockUser.CreatedAt, mockUser.UpdatedAt, nil,
+				mockUser.Username, mockUser.Password, mockUser.Email, mockUser.Role, mockUser.ProfilePicture))
 
 	// 2. Expect GORM to begin a transaction, update, and commit
 	mock.ExpectBegin()
-	// Use int64 for the ID in the WHERE clause
-	mock.ExpectExec(EscapeQuery(`UPDATE "users" SET "email"=$1,"profile_picture"=$2,"updated_at"=$3 WHERE "users"."deleted_at" IS NULL AND "id" = $4`)).
-		WithArgs(updateInput["email"], updateInput["profile_picture"], MockAnyTime{}, int64(mockUserID)).
+	mock.ExpectExec(`UPDATE "users" SET "email"=\$1,"profile_picture"=\$2,"updated_at"=\$3 WHERE "users"\."deleted_at" IS NULL AND "id" = \$4`).
+		WithArgs(updateInput["email"], updateInput["profile_picture"], sqlmock.AnyArg(), int64(mockUserID)).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
 	// Setup Route and Handler
 	router.PUT("/profile", func(c *gin.Context) {
-		c.Set("user", mockUser) // Simulate authenticated user
+		// Set the user ID in context (as middleware would do)
+		c.Set("user", models.User{Model: gorm.Model{ID: mockUserID}})
 		UpdateMyProfile(c)
 	})
 
@@ -137,9 +141,14 @@ func TestGetUserPublicAnimeList(t *testing.T) {
 	// 1. Find the target user by username
 	// Revert to specific username string
 	mock.ExpectQuery(EscapeQuery(`SELECT * FROM "users" WHERE username = $1 AND "users"."deleted_at" IS NULL ORDER BY "users"."id" LIMIT 1`)).
-		WithArgs(targetUsername). // Reverted to specific string
-		WillReturnRows(sqlmock.NewRows([]string{"id", "username"}).AddRow(targetUserID, targetUsername))
-
+		WithArgs(targetUsername).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "created_at", "updated_at", "deleted_at",
+			"username", "password", "email", "role", "profile_picture",
+		}).AddRow(
+			int64(targetUserID), time.Now(), time.Now(), nil,
+			targetUsername, "hashedpassword", "publicuser@example.com", "user", "pic.jpg",
+		))
 	// 2. Find the user's anime list entries
 	listRows := sqlmock.NewRows([]string{"id", "user_id", "anime_external_id", "status", "score", "progress"}).
 		AddRow(10, targetUserID, animeID1, models.Watching, 8, 5).

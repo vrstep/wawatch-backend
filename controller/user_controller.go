@@ -179,13 +179,11 @@ func UpdateMyProfile(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Not authenticated"})
 		return
 	}
-
 	currentUser := userInterface.(models.User)
 
 	var input struct {
-		Email          *string `json:"email"` // Use pointers to detect if field was provided
+		Email          *string `json:"email"`
 		ProfilePicture *string `json:"profile_picture"`
-		// Add password update fields if needed (e.g., CurrentPassword, NewPassword)
 	}
 
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -193,31 +191,30 @@ func UpdateMyProfile(c *gin.Context) {
 		return
 	}
 
-	// Find the user again to ensure we have the latest version
+	// If no fields provided, return error
+	if input.Email == nil && input.ProfilePicture == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
+		return
+	}
+
 	var userToUpdate models.User
 	if err := config.DB.First(&userToUpdate, currentUser.ID).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	// Update fields if they were provided in the request
 	if input.Email != nil {
-		// Add validation for email format if desired
 		userToUpdate.Email = *input.Email
 	}
 	if input.ProfilePicture != nil {
 		userToUpdate.ProfilePicture = *input.ProfilePicture
 	}
 
-	// Handle password update separately if implementing
-	// e.g., check current password, hash new password
-
 	if err := config.DB.Save(&userToUpdate).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile", "details": err.Error()})
 		return
 	}
 
-	// Return updated user data (excluding password)
 	c.JSON(http.StatusOK, gin.H{
 		"id":              userToUpdate.ID,
 		"username":        userToUpdate.Username,
